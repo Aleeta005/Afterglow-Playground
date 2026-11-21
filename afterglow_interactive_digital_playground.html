@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>AFTERGLOW — Interactive Digital Playground</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-void: #04050a;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-void);
+      font-family: 'Inter', sans-serif;
+      color: #f8fafc;
+      touch-action: none; /* Prevent browser pull-to-refresh, zoom, and scrolling */
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      touch-action: none;
+      cursor: crosshair;
+      background: transparent;
+    }
+
+    /* Full-bleed responsive world background layers with dreamy atmospheric blur */
+    .world-bg-layer {
+      position: fixed;
+      inset: -8%;
+      width: 116%;
+      height: 116%;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: 0;
+      filter: blur(22px) brightness(0.68) saturate(1.25);
+      transform: scale(1.12);
+      transition: opacity 0.95s cubic-bezier(0.22, 1, 0.36, 1), transform 1.2s ease-out;
+      animation: bgBreath 18s ease-in-out infinite alternate;
+      will-change: opacity, transform;
+      pointer-events: none;
+    }
+
+    .world-bg-layer.active {
+      opacity: 1;
+    }
+
+    @keyframes bgBreath {
+      0% { transform: scale(1.12) translate3d(0, 0, 0); }
+      50% { transform: scale(1.17) translate3d(-1.2%, -0.8%, 0); }
+      100% { transform: scale(1.14) translate3d(1.2%, 0.7%, 0); }
+    }
+
+    .world-vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(circle at center, rgba(4, 5, 10, 0.08) 0%, rgba(3, 4, 8, 0.64) 100%);
+    }
+
+    .font-display {
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    /* Glassmorphism HUD styling */
+    .glass-panel {
+      background: rgba(10, 12, 22, 0.55);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+    }
+
+    .glass-modal {
+      background: rgba(8, 10, 18, 0.82);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.75);
+    }
+
+    /* World Switcher Glow States */
+    .world-btn {
+      transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .world-btn.active-water {
+      background: rgba(14, 165, 233, 0.24);
+      border-color: rgba(56, 189, 248, 0.72);
+      color: #bae6fd;
+      box-shadow: 0 0 22px rgba(14, 165, 233, 0.4), inset 0 0 12px rgba(56, 189, 248, 0.22);
+    }
+
+    .world-btn.active-silk {
+      background: rgba(132, 204, 22, 0.24);
+      border-color: rgba(190, 242, 100, 0.7);
+      color: #ecfccb;
+      box-shadow: 0 0 22px rgba(132, 204, 22, 0.38), inset 0 0 12px rgba(163, 230, 53, 0.22);
+    }
+
+    .world-btn.active-firefly {
+      background: rgba(245, 158, 11, 0.25);
+      border-color: rgba(251, 191, 36, 0.72);
+      color: #fef3c7;
+      box-shadow: 0 0 22px rgba(245, 158, 11, 0.4), inset 0 0 12px rgba(251, 191, 36, 0.22);
+    }
+
+    /* Subtle breathing pulse for idle guide */
+    @keyframes floatSlow {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-3px); }
+    }
+
+    .animate-float {
+      animation: floatSlow 4s ease-in-out infinite;
+    }
+
+    /* Custom subtle scrollbar for modal on small screens */
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden bg-[#04050a]">
+
+  <!-- Full-Bleed Responsive Blurred World Background Photographs -->
+  <div id="bgLayerContainer" class="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+    <!-- WATER: Electric Cobalt & Cyan Energy on Pitch Black -->
+    <div id="bg-water" class="world-bg-layer active"></div>
+
+    <!-- SILK: Glossy Olive-Emerald & Chartreuse Satin Fabric -->
+    <div id="bg-silk" class="world-bg-layer"></div>
+
+    <!-- FIREFLY: Warm Amber, Gold & Burnt Sienna Film-Grain Bokeh -->
+    <div id="bg-firefly" class="world-bg-layer"></div>
+
+    <!-- Atmospheric Vignette & Readability Contrast Layer -->
+    <div class="world-vignette"></div>
+  </div>
+
+  <!-- Full-Screen Transparent Interactive Canvas -->
+  <canvas id="afterglowCanvas" class="relative z-[1]"></canvas>
+
+  <!-- Top Minimal Header Overlay -->
+  <header id="topHud" class="fixed top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-3 sm:px-7 sm:py-5 pointer-events-none transition-opacity duration-500">
+    <!-- Title Badge -->
+    <div class="pointer-events-auto flex items-center gap-3 glass-panel px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-full">
+      <span id="worldStatusDot" class="w-2.5 h-2.5 rounded-full bg-sky-400 shadow-[0_0_10px_#38bdf8] transition-colors duration-500"></span>
+      <div class="flex flex-col sm:flex-row sm:items-baseline sm:gap-2.5">
+        <h1 class="font-display text-sm sm:text-base font-bold tracking-[0.22em] text-white">AFTERGLOW</h1>
+        <span class="hidden md:inline-block text-[10px] tracking-[0.18em] uppercase text-slate-400 font-medium">Interactive Installation</span>
+      </div>
+    </div>
+
+    <!-- Right Quick Actions -->
+    <div class="pointer-events-auto flex items-center gap-2 sm:gap-2.5">
+      <!-- Sound Toggle -->
+      <button id="btnSound" aria-label="Toggle Sound" title="Toggle Generative Audio"
+        class="glass-panel hover:bg-white/10 active:scale-95 transition-all p-2.5 sm:px-3.5 sm:py-2.5 rounded-full flex items-center gap-2 text-slate-200 border border-white/10">
+        <!-- Sound Off Icon -->
+        <svg id="iconSoundOff" class="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6"/>
+        </svg>
+        <!-- Sound On Icon -->
+        <svg id="iconSoundOn" class="w-4 h-4 sm:w-5 sm:h-5 text-cyan-300 hidden" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"/>
+        </svg>
+        <span id="soundLabel" class="hidden sm:inline text-xs font-medium tracking-wider uppercase text-slate-300">Sound Off</span>
+      </button>
+
+      <!-- Pause / Resume Button -->
+      <button id="btnPause" aria-label="Pause or Resume" title="Pause / Resume Simulation"
+        class="glass-panel hover:bg-white/10 active:scale-95 transition-all p-2.5 sm:px-3.5 sm:py-2.5 rounded-full flex items-center gap-2 text-slate-200 border border-white/10">
+        <svg id="iconPause" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <svg id="iconPlay" class="w-4 h-4 sm:w-5 sm:h-5 text-amber-300 hidden" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span id="pauseLabel" class="hidden md:inline text-xs font-medium tracking-wider uppercase text-slate-300">Pause</span>
+      </button>
+
+      <!-- Restart / Clear Button -->
+      <button id="btnRestart" aria-label="Restart Canvas" title="Clear & Reset World"
+        class="glass-panel hover:bg-white/10 active:scale-95 transition-all p-2.5 sm:px-3.5 sm:py-2.5 rounded-full flex items-center gap-2 text-slate-200 border border-white/10">
+        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        <span class="hidden md:inline text-xs font-medium tracking-wider uppercase text-slate-300">Reset</span>
+      </button>
+
+      <!-- How to Play Button -->
+      <button id="btnHelp" aria-label="How to Play" title="How to Play & Guide"
+        class="glass-panel hover:bg-white/15 active:scale-95 transition-all p-2.5 sm:px-3.5 sm:py-2.5 rounded-full flex items-center gap-1.5 text-slate-100 border border-white/15">
+        <svg class="w-4 h-4 sm:w-5 sm:h-5 text-cyan-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span class="hidden sm:inline text-xs font-medium tracking-wider uppercase">Guide</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Paused Center Indicator Badge -->
+  <div id="pausedBanner" class="fixed inset-0 z-10 flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-300">
+    <div class="glass-panel px-6 py-3 rounded-full border border-white/20 flex items-center gap-3">
+      <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+      <span class="font-display text-xs sm:text-sm tracking-[0.25em] uppercase text-amber-200 font-semibold">Simulation Paused</span>
+    </div>
+  </div>
+
+  <!-- Bottom Floating World Switcher & Navigation Hint -->
+  <footer id="bottomHud" class="fixed bottom-0 left-0 right-0 z-20 flex flex-col items-center justify-end pb-4 sm:pb-7 px-4 pointer-events-none transition-opacity duration-500">
+    
+    <!-- Short Unobtrusive Navigation Guide -->
+    <div id="navGuide" class="mb-3 px-4 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/5 text-center transition-all duration-700 animate-float">
+      <p id="navGuideText" class="text-[11px] sm:text-xs tracking-[0.14em] text-slate-300/90 font-light">
+        Touch, drag, or swirl with multiple fingers &bull; Switch worlds below
+      </p>
+    </div>
+
+    <!-- World Selector Pills -->
+    <nav aria-label="World Switcher" class="pointer-events-auto glass-panel p-1.5 rounded-full flex items-center gap-1.5 sm:gap-2">
+      <button data-world="water" class="world-btn active-water px-4 py-2.5 sm:px-6 sm:py-2.5 rounded-full border border-transparent font-display text-xs sm:text-sm font-semibold tracking-[0.18em] uppercase flex items-center gap-2">
+        <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+        WATER
+      </button>
+
+      <button data-world="silk" class="world-btn px-4 py-2.5 sm:px-6 sm:py-2.5 rounded-full border border-transparent font-display text-xs sm:text-sm font-semibold tracking-[0.18em] uppercase text-slate-300 hover:text-white flex items-center gap-2">
+        <span class="w-1.5 h-1.5 rounded-full bg-lime-400"></span>
+        SILK
+      </button>
+
+      <button data-world="firefly" class="world-btn px-4 py-2.5 sm:px-6 sm:py-2.5 rounded-full border border-transparent font-display text-xs sm:text-sm font-semibold tracking-[0.18em] uppercase text-slate-300 hover:text-white flex items-center gap-2">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+        FIREFLY
+      </button>
+    </nav>
+  </footer>
+
+  <!-- How to Play / Installation Guide Modal -->
+  <div id="helpModal" class="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-6 bg-black/65 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="glass-modal w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-3xl p-6 sm:p-8 text-slate-100 transform scale-95 transition-transform duration-300" id="helpModalCard">
+      
+      <!-- Modal Header -->
+      <div class="flex items-start justify-between gap-4 pb-5 border-b border-white/10">
+        <div>
+          <span class="text-[11px] font-semibold tracking-[0.22em] uppercase text-cyan-400">Tech-Fest Interactive Experience</span>
+          <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-wide text-white mt-1">Welcome to AFTERGLOW</h2>
+        </div>
+        <button id="btnCloseHelpX" aria-label="Close Guide" class="p-2 rounded-full bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Three Worlds Explanation -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 my-6">
+        <!-- Water Card -->
+        <div class="rounded-2xl p-4 bg-sky-950/35 border border-sky-400/30">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-sky-400 shadow-[0_0_8px_#38bdf8]"></span>
+            <h3 class="font-display font-bold tracking-wider text-sm text-sky-300 uppercase">Water</h3>
+          </div>
+          <p class="text-xs leading-relaxed text-slate-300">
+            Tap to drop electric cobalt ripples and drag across the abyssal energy field to carve glowing waves and ice-white splashes.
+          </p>
+        </div>
+
+        <!-- Silk Card -->
+        <div class="rounded-2xl p-4 bg-lime-950/35 border border-lime-400/30">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-lime-400 shadow-[0_0_8px_#a3e635]"></span>
+            <h3 class="font-display font-bold tracking-wider text-sm text-lime-300 uppercase">Silk</h3>
+          </div>
+          <p class="text-xs leading-relaxed text-slate-300">
+            Weave luminous emerald, chartreuse, and pearlescent satin ribbons across draped green silk folds with fluid harmonic motion.
+          </p>
+        </div>
+
+        <!-- Firefly Card -->
+        <div class="rounded-2xl p-4 bg-amber-950/35 border border-amber-400/30">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]"></span>
+            <h3 class="font-display font-bold tracking-wider text-sm text-amber-300 uppercase">Firefly</h3>
+          </div>
+          <p class="text-xs leading-relaxed text-slate-300">
+            Touch and hold to summon warm amber and honey fireflies into glowing constellations, or swipe fast to scatter burnt-gold sparks.
+          </p>
+        </div>
+      </div>
+
+      <!-- Gestures & Multi-touch Tips -->
+      <div class="rounded-2xl bg-white/[0.03] border border-white/10 p-4 sm:p-5 mb-6">
+        <h4 class="font-display text-xs font-semibold tracking-[0.18em] uppercase text-slate-300 mb-3">Multi-Touch & Controls</h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-300">
+          <div class="flex items-start gap-2.5">
+            <span class="px-2 py-0.5 rounded bg-white/10 text-emerald-300 font-mono text-[11px]">TOUCH AUDIO</span>
+            <span>When sound is enabled, gentle notes play only when you touch or drag across the canvas.</span>
+          </div>
+          <div class="flex items-start gap-2.5">
+            <span class="px-2 py-0.5 rounded bg-white/10 text-lime-300 font-mono text-[11px]">HOLD / SWIPE</span>
+            <span>Hold steady to focus energy; flick rapidly to unleash bursts of particles and harmonic chimes.</span>
+          </div>
+          <div class="flex items-start gap-2.5">
+            <span class="px-2 py-0.5 rounded bg-white/10 text-emerald-300 font-mono text-[11px]">GENERATIVE AUDIO</span>
+            <span>Every touch synthesizes real-time pentatonic ripples, warm synth pads, and celesta bells.</span>
+          </div>
+          <div class="flex items-start gap-2.5">
+            <span class="px-2 py-0.5 rounded bg-white/10 text-amber-300 font-mono text-[11px]">PAUSE / RESET</span>
+            <span>Freeze a masterpiece mid-motion with Pause, or clear the canvas anytime with Reset.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Enter Button -->
+      <div class="flex justify-end">
+        <button id="btnStartExperience" class="w-full sm:w-auto px-7 py-3 rounded-full bg-gradient-to-r from-sky-400 via-lime-400 to-amber-400 text-slate-950 font-display font-bold text-xs sm:text-sm tracking-[0.18em] uppercase shadow-lg hover:brightness-110 active:scale-95 transition-all">
+          Enter Playground
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * AFTERGLOW - Interactive Multi-Touch Digital Playground
+     * Worlds: WATER, SILK, FIREFLY
+     * Includes Full-Bleed Blurred Photographic Backdrops, Generative Web Audio API Synthesizer,
+     * Multi-Touch Engine, and Ambient Idle AI.
+     */
+    (() => {
+      'use strict';
+
+      // =========================================================================
+      // 2. TOUCH-ONLY GENERATIVE AUDIO (NO CONTINUOUS SYNTH DRONE)
+      // =========================================================================
+      class TouchSoundEngine {
+        constructor() {
+          this.ctx = null;
+          this.masterGain = null;
+          this.enabled = false;
+          this.lastNoteTime = 0;
+          this.scales = {
+            water: [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25],
+            silk: [220.00, 261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 659.25],
+            firefly: [392.00, 440.00, 493.88, 587.33, 659.25, 783.99, 880.00, 987.77]
+          };
+        }
+
+        init() {
+          if (this.ctx) return;
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return;
+
+          this.ctx = new AudioCtx();
+          this.masterGain = this.ctx.createGain();
+          this.masterGain.gain.value = 0.45;
+          this.masterGain.connect(this.ctx.destination);
+          STATE.audioInitialized = true;
+        }
+
+        setEnabled(enable) {
+          this.enabled = enable;
+          if (enable) {
+            this.init();
+            if (this.ctx && this.ctx.state === 'suspended') {
+              this.ctx.resume();
+            }
+          } else if (this.ctx && this.ctx.state === 'running') {
+            this.ctx.suspend();
+          }
+        }
+
+        playTouchNote(world, normX = 0.5, normY = 0.5, intensity = 0.6) {
+          if (!this.enabled || !this.ctx || STATE.paused) return;
+          if (this.ctx.state === 'suspended') {
+            this.ctx.resume();
+          }
+          const nowMs = performance.now();
+          const minGap = world === 'firefly' ? 95 : 130;
+          if (nowMs - this.lastNoteTime < minGap) return;
+          this.lastNoteTime = nowMs;
+
+          const scale = this.scales[world] || this.scales.water;
+          const idx = Math.min(
+            scale.length - 1,
+            Math.max(0, Math.floor((1 - Math.min(1, Math.max(0, normY))) * scale.length))
+          );
+          const detuneCents = (normX - 0.5) * 35;
+          const freq = scale[idx];
+
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const noteGain = this.ctx.createGain();
+
+          osc.type = world === 'water' ? 'sine' : world === 'silk' ? 'triangle' : 'sine';
+          osc.frequency.setValueAtTime(freq, now);
+          osc.detune.setValueAtTime(detuneCents, now);
+
+          const peak = Math.min(0.18, Math.max(0.025, intensity * 0.14));
+          const duration = world === 'silk' ? 0.65 : world === 'water' ? 0.48 : 0.34;
+
+          noteGain.gain.setValueAtTime(0.0001, now);
+          noteGain.gain.linearRampToValueAtTime(peak, now + 0.025);
+          noteGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+          osc.connect(noteGain);
+          noteGain.connect(this.masterGain);
+
+          osc.start(now);
+          osc.stop(now + duration + 0.03);
+        }
+      }
+
+      const audioEngine = new TouchSoundEngine();
+
+      // =========================================================================
+      const STATE = {
+        world: 'water',
+        width: window.innerWidth,
+        height: window.innerHeight,
+        dpr: Math.min(window.devicePixelRatio || 1, 2),
+        time: 0,
+        paused: false,
+        soundEnabled: false,
+        audioInitialized: false,
+        lastInteractionTime: performance.now(),
+        worldTransitionAlpha: 0,
+        pointers: new Map(),
+        idleAgent: {
+          x: window.innerWidth * 0.5,
+          y: window.innerHeight * 0.5,
+          angle: 0,
+          pulseTimer: 0
+        }
+      };
+
+      const WORLD_META = {
+        water: {
+          activeClass: 'active-water',
+          dotClass: 'bg-sky-400 shadow-[0_0_10px_#38bdf8]',
+          guide: 'Touch or drag across the blue energy field to create flowing liquid ripples & waves'
+        },
+        silk: {
+          activeClass: 'active-silk',
+          dotClass: 'bg-lime-400 shadow-[0_0_10px_#a3e635]',
+          guide: 'Glide your fingers across the green silk folds to weave luminous satin ribbons'
+        },
+        firefly: {
+          activeClass: 'active-firefly',
+          dotClass: 'bg-amber-400 shadow-[0_0_10px_#fbbf24]',
+          guide: 'Hold to gather warm golden fireflies into constellations • Swipe fast to scatter sparks'
+        }
+      };
+
+      const canvas = document.getElementById('afterglowCanvas');
+      const ctx = canvas.getContext('2d', { alpha: true });
+
+      const bgLayers = {
+        water: document.getElementById('bg-water'),
+        silk: document.getElementById('bg-silk'),
+        firefly: document.getElementById('bg-firefly')
+      };
+
+      const worldButtons = document.querySelectorAll('.world-btn');
+      const worldStatusDot = document.getElementById('worldStatusDot');
+      const navGuideText = document.getElementById('navGuideText');
+      const btnSound = document.getElementById('btnSound');
+      const iconSoundOff = document.getElementById('iconSoundOff');
+      const iconSoundOn = document.getElementById('iconSoundOn');
+      const soundLabel = document.getElementById('soundLabel');
+      const btnPause = document.getElementById('btnPause');
+      const iconPause = document.getElementById('iconPause');
+      const iconPlay = document.getElementById('iconPlay');
+      const pauseLabel = document.getElementById('pauseLabel');
+      const pausedBanner = document.getElementById('pausedBanner');
+      const btnRestart = document.getElementById('btnRestart');
+      const btnHelp = document.getElementById('btnHelp');
+      const helpModal = document.getElementById('helpModal');
+      const helpModalCard = document.getElementById('helpModalCard');
+      const btnCloseHelpX = document.getElementById('btnCloseHelpX');
+      const btnStartExperience = document.getElementById('btnStartExperience');
+
+      function generateEmbeddedPhotoBackdrops() {
+        try {
+          // 1. WATER: Electric cobalt & cyan energy filaments on dark abyss
+          const waterOff = document.createElement('canvas');
+          waterOff.width = 540;
+          waterOff.height = 960;
+          const wCtx = waterOff.getContext('2d');
+          wCtx.fillStyle = '#02050c';
+          wCtx.fillRect(0, 0, waterOff.width, waterOff.height);
+
+          const tendrils = [
+            { x0: 420, y0: 0, cx1: 520, cy1: 120, cx2: 330, cy2: 210, x1: 495, y1: 360, w: 28 },
+            { x0: 510, y0: 420, cx1: 380, cy1: 510, cx2: 535, cy2: 630, x1: 465, y1: 960, w: 34 },
+            { x0: 0, y0: 400, cx1: 120, cy1: 380, cx2: 180, cy2: 460, x1: 240, y1: 440, w: 18 },
+            { x0: 270, y0: 760, cx1: 340, cy1: 860, cx2: 450, cy2: 730, x1: 490, y1: 850, w: 26 },
+            { x0: 80, y0: 120, cx1: 150, cy1: 340, cx2: 40, cy2: 580, x1: 140, y1: 820, w: 10 }
+          ];
+
+          tendrils.forEach((t, idx) => {
+            wCtx.save();
+            wCtx.lineCap = 'round';
+            wCtx.beginPath();
+            wCtx.moveTo(t.x0, t.y0);
+            wCtx.bezierCurveTo(t.cx1, t.cy1, t.cx2, t.cy2, t.x1, t.y1);
+            wCtx.strokeStyle = idx === 4 ? 'rgba(56, 189, 248, 0.25)' : 'rgba(14, 165, 233, 0.45)';
+            wCtx.lineWidth = t.w * 2.4;
+            wCtx.filter = 'blur(26px)';
+            wCtx.stroke();
+
+            wCtx.beginPath();
+            wCtx.moveTo(t.x0, t.y0);
+            wCtx.bezierCurveTo(t.cx1, t.cy1, t.cx2, t.cy2, t.x1, t.y1);
+            wCtx.strokeStyle = 'rgba(186, 230, 253, 0.85)';
+            wCtx.lineWidth = Math.max(4, t.w * 0.42);
+            wCtx.filter = 'blur(6px)';
+            wCtx.stroke();
+            wCtx.restore();
+          });
+          if (bgLayers.water) {
+            bgLayers.water.style.backgroundImage = `url("${waterOff.toDataURL('image/jpeg', 0.85)}")`;
+          }
+
+          // 2. SILK: Draped olive-emerald & chartreuse satin folds with soft highlights
+          const silkOff = document.createElement('canvas');
+          silkOff.width = 540;
+          silkOff.height = 960;
+          const sCtx = silkOff.getContext('2d');
+          const silkGrad = sCtx.createLinearGradient(0, 0, silkOff.width, silkOff.height);
+          silkGrad.addColorStop(0, '#3f5a14');
+          silkGrad.addColorStop(0.5, '#2b400b');
+          silkGrad.addColorStop(1, '#1d2d07');
+          sCtx.fillStyle = silkGrad;
+          sCtx.fillRect(0, 0, silkOff.width, silkOff.height);
+
+          for (let i = 0; i < 8; i++) {
+            sCtx.save();
+            const yBase = 80 + i * 115;
+            sCtx.beginPath();
+            sCtx.moveTo(-40, yBase);
+            sCtx.bezierCurveTo(
+              160, yBase + Math.sin(i * 1.4) * 95,
+              360, yBase - Math.cos(i * 1.1) * 95,
+              580, yBase + Math.sin(i * 0.8) * 70
+            );
+            sCtx.strokeStyle = i % 2 === 0 ? 'rgba(217, 249, 157, 0.35)' : 'rgba(15, 23, 5, 0.55)';
+            sCtx.lineWidth = i % 2 === 0 ? 48 : 66;
+            sCtx.filter = 'blur(24px)';
+            sCtx.stroke();
+            sCtx.restore();
+          }
+
+          const highlightGlow = sCtx.createRadialGradient(455, 165, 10, 455, 165, 175);
+          highlightGlow.addColorStop(0, 'rgba(247, 254, 231, 0.72)');
+          highlightGlow.addColorStop(0.5, 'rgba(163, 230, 53, 0.22)');
+          highlightGlow.addColorStop(1, 'rgba(30, 46, 8, 0)');
+          sCtx.fillStyle = highlightGlow;
+          sCtx.fillRect(0, 0, silkOff.width, silkOff.height);
+
+          if (bgLayers.silk) {
+            bgLayers.silk.style.backgroundImage = `url("${silkOff.toDataURL('image/jpeg', 0.85)}")`;
+          }
+
+          // 3. FIREFLY: Warm golden-amber & burnt-sienna bokeh orbs with subtle grain
+          const fireOff = document.createElement('canvas');
+          fireOff.width = 540;
+          fireOff.height = 960;
+          const fCtx = fireOff.getContext('2d');
+          fCtx.fillStyle = '#120804';
+          fCtx.fillRect(0, 0, fireOff.width, fireOff.height);
+
+          const orbs = [
+            { x: 380, y: 120, r: 220, c0: 'rgba(253, 224, 71, 0.85)', c1: 'rgba(217, 119, 6, 0.35)' },
+            { x: 60, y: 420, r: 270, c0: 'rgba(250, 204, 21, 0.8)', c1: 'rgba(180, 83, 9, 0.32)' },
+            { x: 495, y: 560, r: 195, c0: 'rgba(251, 191, 36, 0.78)', c1: 'rgba(194, 65, 12, 0.28)' },
+            { x: 250, y: 880, r: 310, c0: 'rgba(254, 240, 138, 0.88)', c1: 'rgba(202, 138, 4, 0.35)' },
+            { x: 240, y: 340, r: 190, c0: 'rgba(154, 52, 18, 0.45)', c1: 'rgba(18, 8, 4, 0)' }
+          ];
+
+          orbs.forEach((o) => {
+            const g = fCtx.createRadialGradient(o.x, o.y, 12, o.x, o.y, o.r);
+            g.addColorStop(0, o.c0);
+            g.addColorStop(0.55, o.c1);
+            g.addColorStop(1, 'rgba(18, 8, 4, 0)');
+            fCtx.fillStyle = g;
+            fCtx.beginPath();
+            fCtx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+            fCtx.fill();
+          });
+
+          // Subtle film grain texture
+          for (let gIdx = 0; gIdx < 3200; gIdx++) {
+            const gx = Math.random() * fireOff.width;
+            const gy = Math.random() * fireOff.height;
+            fCtx.fillStyle = Math.random() > 0.5 ? 'rgba(255, 255, 255, 0.045)' : 'rgba(0, 0, 0, 0.06)';
+            fCtx.fillRect(gx, gy, 2, 2);
+          }
+
+          if (bgLayers.firefly) {
+          bgLayers.firefly.style.backgroundImage = `url("${fireOff.toDataURL('image/jpeg', 0.85)}")`;
+        }
+      } catch (err) {
+        console.warn('Backdrop generation fallback:', err);
+      }
+    }
+
+    // =========================================================================
+    // 3. WORLD 1: WATER SIMULATION (Fluid Lobes, Undulating Waves & Droplets)
+    // =========================================================================
+    class WaterWorld {
+        constructor() {
+          this.waves = [];
+          this.droplets = [];
+          this.flowStreams = [];
+          this.causticPhase = 0;
+        }
+
+        reset() {
+          this.waves = [];
+          this.droplets = [];
+          this.flowStreams = [];
+          this.spawnRipple(STATE.width * 0.35, STATE.height * 0.45, 1.05, 204);
+          this.spawnRipple(STATE.width * 0.65, STATE.height * 0.55, 1.15, 196);
+        }
+
+        spawnRipple(x, y, strength = 1, hue = 202) {
+          if (this.waves.length > 52) this.waves.shift();
+          const lobes = 14;
+          const phaseOffsets = [];
+          const ampWeights = [];
+          for (let i = 0; i < lobes; i++) {
+            phaseOffsets.push(Math.random() * Math.PI * 2);
+            ampWeights.push(0.45 + Math.random() * 0.75);
+          }
+
+          this.waves.push({
+            x,
+            y,
+            vx: 0,
+            vy: 0,
+            radius: 14,
+            maxRadius: 190 + strength * 220,
+            growthSpeed: 1.55 + strength * 1.65,
+            alpha: Math.min(0.92, 0.52 + strength * 0.32),
+            hue: hue + (Math.random() - 0.5) * 14,
+            wobbleFreq: 2 + Math.floor(Math.random() * 3),
+            wobbleSpeed: 0.035 + Math.random() * 0.025,
+            phase: Math.random() * Math.PI * 2,
+            lobes,
+            phaseOffsets,
+            ampWeights
+          });
+        }
+
+        spawnFlowBlob(x, y, vx, vy, speed) {
+          if (this.flowStreams.length > 140) this.flowStreams.shift();
+          const clampedSpeed = Math.min(speed, 38);
+          this.flowStreams.push({
+            x,
+            y,
+            vx: vx * 0.38 + (Math.random() - 0.5) * 0.8,
+            vy: vy * 0.38 + (Math.random() - 0.5) * 0.8,
+            radius: 14 + Math.min(34, clampedSpeed * 1.05),
+            alpha: Math.min(0.55, 0.22 + clampedSpeed * 0.012),
+            decay: 0.011 + Math.random() * 0.008,
+            hue: 196 + Math.min(20, clampedSpeed * 0.5)
+          });
+        }
+
+        spawnSplash(x, y, vx, vy, count = 7) {
+          for (let i = 0; i < count; i++) {
+            if (this.droplets.length > 190) this.droplets.shift();
+            const angle = Math.random() * Math.PI * 2;
+            const spd = 0.6 + Math.random() * 2.8;
+            this.droplets.push({
+              x,
+              y,
+              vx: Math.cos(angle) * spd + vx * 0.28,
+              vy: Math.sin(angle) * spd + vy * 0.28,
+              radius: 5 + Math.random() * 11,
+              alpha: 0.55 + Math.random() * 0.25,
+              decay: 0.014 + Math.random() * 0.014,
+              hue: 194 + Math.random() * 20
+            });
+          }
+        }
+
+        onPointerDown(x, y) {
+          this.spawnRipple(x, y, 1.3, 202);
+          this.spawnFlowBlob(x, y, 0, 0, 14);
+          this.spawnSplash(x, y, 0, 0, 10);
+          audioEngine.playTouchNote('water', x / STATE.width, y / STATE.height, 0.85);
+        }
+
+        onPointerMove(x, y, vx, vy, speed) {
+          const intensity = Math.min(1.35, speed / 22);
+          this.spawnFlowBlob(x, y, vx, vy, speed);
+
+          if (speed > 2.5 && Math.random() < 0.55) {
+            this.spawnRipple(x, y, 0.4 + intensity * 0.65, 196 + intensity * 14);
+          }
+          if (speed > 5) {
+            this.spawnSplash(x, y, vx, vy, Math.min(6, Math.floor(speed / 5)));
+          }
+          audioEngine.playTouchNote('water', x / STATE.width, y / STATE.height, intensity);
+        }
+
+        traceOrganicContour(ctx, cx, cy, baseRadius, phase, wobbleFreq, ampScale) {
+          const steps = 28;
+          const pts = [];
+          for (let i = 0; i < steps; i++) {
+            const theta = (i / steps) * Math.PI * 2;
+            const organicWave =
+              Math.sin(theta * wobbleFreq + phase) * 0.11 +
+              Math.cos(theta * (wobbleFreq + 2) - phase * 1.25) * 0.065 +
+              Math.sin(theta * 2 + phase * 0.6) * 0.045;
+            const r = Math.max(4, baseRadius * (1 + organicWave * ampScale));
+            pts.push({
+              x: cx + Math.cos(theta) * r,
+              y: cy + Math.sin(theta) * r
+            });
+          }
+
+          ctx.beginPath();
+          const firstMidX = (pts[steps - 1].x + pts[0].x) * 0.5;
+          const firstMidY = (pts[steps - 1].y + pts[0].y) * 0.5;
+          ctx.moveTo(firstMidX, firstMidY);
+
+          for (let i = 0; i < steps; i++) {
+            const curr = pts[i];
+            const next = pts[(i + 1) % steps];
+            const midX = (curr.x + next.x) * 0.5;
+            const midY = (curr.y + next.y) * 0.5;
+            ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
+          }
+          ctx.closePath();
+        }
+
+        update(dt) {
+          this.causticPhase += 0.014;
+
+          // Drift & expand organic liquid swells
+          for (let i = this.waves.length - 1; i >= 0; i--) {
+            const w = this.waves[i];
+            w.radius += w.growthSpeed;
+            w.phase += w.wobbleSpeed;
+            w.x += Math.cos(this.causticPhase * 0.7 + w.phase) * 0.35;
+            w.y += Math.sin(this.causticPhase * 0.6 + w.phase) * 0.35 - 0.18;
+
+            const progress = w.radius / w.maxRadius;
+            w.alpha = Math.pow(1 - progress, 1.55) * 0.72;
+
+            if (w.radius >= w.maxRadius || w.alpha <= 0.01) {
+              this.waves.splice(i, 1);
+            }
+          }
+
+          // Smoothly advect & expand flowing water patches
+          for (let i = this.flowStreams.length - 1; i >= 0; i--) {
+            const f = this.flowStreams[i];
+            f.x += f.vx + Math.sin(this.causticPhase + f.y * 0.006) * 0.45;
+            f.y += f.vy + Math.cos(this.causticPhase * 0.9 + f.x * 0.006) * 0.45;
+            f.vx *= 0.94;
+            f.vy *= 0.94;
+            f.radius *= 1.018;
+            f.alpha -= f.decay;
+
+            if (f.alpha <= 0.01) {
+              this.flowStreams.splice(i, 1);
+            }
+          }
+
+          // Soft liquid droplets that merge rather than streak
+          for (let i = this.droplets.length - 1; i >= 0; i--) {
+            const d = this.droplets[i];
+            d.x += d.vx;
+            d.y += d.vy;
+            d.vx *= 0.93;
+            d.vy *= 0.93;
+            d.radius *= 1.012;
+            d.alpha -= d.decay;
+
+            if (d.alpha <= 0.01) {
+              this.droplets.splice(i, 1);
+            }
+          }
+        }
+
+        render(ctx) {
+          ctx.clearRect(0, 0, STATE.width, STATE.height);
+
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+
+          // 1. Soft undulating current sheets (wide feathered bands)
+          for (let w = 0; w < 3; w++) {
+            ctx.beginPath();
+            const baseY = STATE.height * (0.25 + w * 0.24);
+            ctx.moveTo(0, baseY);
+            for (let x = 0; x <= STATE.width; x += 80) {
+              const waveY =
+                baseY +
+                Math.sin(x * 0.0032 + this.causticPhase + w * 1.7) * 34 +
+                Math.cos(x * 0.0065 - this.causticPhase * 0.7) * 16;
+              ctx.lineTo(x, waveY);
+            }
+            ctx.strokeStyle = 'rgba(30, 144, 255, 0.038)';
+            ctx.lineWidth = 76;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+          }
+
+          // 2. Flowing liquid stream blobs (smooth feathered gradients, no hard edges)
+          for (let i = 0; i < this.flowStreams.length; i++) {
+            const f = this.flowStreams[i];
+            const grad = ctx.createRadialGradient(f.x, f.y, f.radius * 0.05, f.x, f.y, f.radius);
+            grad.addColorStop(0, `hsla(${f.hue - 8}, 100%, 80%, ${f.alpha * 0.75})`);
+            grad.addColorStop(0.5, `hsla(${f.hue}, 100%, 58%, ${f.alpha * 0.42})`);
+            grad.addColorStop(1, `hsla(${f.hue + 10}, 100%, 42%, 0)`);
+
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // 3. Organic undulating water swells & soft refractive crests
+          for (let i = 0; i < this.waves.length; i++) {
+            const w = this.waves[i];
+
+            // Outer soft liquid pool gradient
+            const poolGrad = ctx.createRadialGradient(w.x, w.y, w.radius * 0.15, w.x, w.y, w.radius);
+            poolGrad.addColorStop(0, `hsla(${w.hue - 10}, 100%, 84%, ${w.alpha * 0.24})`);
+            poolGrad.addColorStop(0.62, `hsla(${w.hue}, 100%, 58%, ${w.alpha * 0.16})`);
+            poolGrad.addColorStop(0.88, `hsla(${w.hue + 6}, 100%, 66%, ${w.alpha * 0.24})`);
+            poolGrad.addColorStop(1, `hsla(${w.hue + 10}, 100%, 50%, 0)`);
+
+            this.traceOrganicContour(ctx, w.x, w.y, w.radius, w.phase, w.wobbleFreq, 1.0);
+            ctx.fillStyle = poolGrad;
+            ctx.fill();
+
+            // Soft feathered wave crest (blurred stroke rather than sharp line)
+            ctx.save();
+            ctx.filter = 'blur(5px)';
+            this.traceOrganicContour(ctx, w.x, w.y, w.radius * 0.9, w.phase * 1.15, w.wobbleFreq, 0.9);
+            ctx.strokeStyle = `hsla(${w.hue - 6}, 100%, 78%, ${w.alpha * 0.45})`;
+            ctx.lineWidth = Math.max(4, w.radius * 0.055);
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          // 4. Soft blurred water droplets
+          ctx.save();
+          ctx.filter = 'blur(4px)';
+          for (let i = 0; i < this.droplets.length; i++) {
+            const d = this.droplets[i];
+            const dropGrad = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.radius);
+            dropGrad.addColorStop(0, `hsla(${d.hue - 8}, 100%, 88%, ${d.alpha})`);
+            dropGrad.addColorStop(0.6, `hsla(${d.hue}, 100%, 62%, ${d.alpha * 0.55})`);
+            dropGrad.addColorStop(1, `hsla(${d.hue + 8}, 100%, 48%, 0)`);
+
+            ctx.fillStyle = dropGrad;
+            ctx.beginPath();
+            ctx.arc(d.x, d.y, d.radius, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+
+          ctx.restore();
+        }
+      }
+
+      // =========================================================================
+      // 4. WORLD 2: SILK SIMULATION (Emerald, Chartreuse & Pearlescent Satin Ribbons)
+      // =========================================================================
+      class SilkWorld {
+        constructor() {
+          this.ribbons = new Map();
+          this.completedRibbons = [];
+          this.hueOffset = 86;
+          this.needsClear = true;
+        }
+
+        reset() {
+          this.ribbons.clear();
+          this.completedRibbons = [];
+          this.needsClear = true;
+        }
+
+        createRibbon(id, x, y, baseHue) {
+          const strands = [];
+          const strandCount = 5;
+          for (let s = 0; s < strandCount; s++) {
+            strands.push({
+              points: [{ x, y, vx: 0, vy: 0, width: 2 }],
+              phaseOffset: (s / strandCount) * Math.PI * 2,
+              freq: 0.08 + s * 0.018,
+              amp: 6 + s * 4.5,
+              hueShift: (s - 2) * 8,
+              lightness: s === 2 ? 84 : 62 + s * 4
+            });
+          }
+          return {
+            id,
+            x,
+            y,
+            baseHue,
+            strands,
+            life: 1.0,
+            active: true
+          };
+        }
+
+        onPointerDown(id, x, y) {
+          this.hueOffset = 74 + ((this.hueOffset - 74 + 13) % 40);
+          const ribbon = this.createRibbon(id, x, y, this.hueOffset);
+          this.ribbons.set(id, ribbon);
+          audioEngine.playTouchNote('silk', x / STATE.width, y / STATE.height, 0.7);
+        }
+
+        onPointerMove(id, x, y, vx, vy, speed) {
+          let ribbon = this.ribbons.get(id);
+          if (!ribbon) {
+            this.onPointerDown(id, x, y);
+            ribbon = this.ribbons.get(id);
+          }
+
+          ribbon.x = x;
+          ribbon.y = y;
+          ribbon.baseHue = 92 + Math.sin(STATE.time * 0.025) * 18;
+
+          const perpAngle = Math.atan2(vy, vx) + Math.PI / 2;
+          const dynamicWidth = Math.min(14, 2.0 + speed * 0.32);
+
+          ribbon.strands.forEach((strand, idx) => {
+            const wave = Math.sin(STATE.time * strand.freq + strand.phaseOffset) *
+              (strand.amp + Math.min(24, speed * 0.6));
+            const px = x + Math.cos(perpAngle) * wave;
+            const py = y + Math.sin(perpAngle) * wave;
+
+            strand.points.push({
+              x: px,
+              y: py,
+              vx: vx * 0.08,
+              vy: vy * 0.08,
+              width: dynamicWidth * (1 - idx * 0.11)
+            });
+
+            if (strand.points.length > 44) {
+              strand.points.shift();
+            }
+          });
+
+          audioEngine.playTouchNote('silk', x / STATE.width, y / STATE.height, Math.min(1, speed / 25));
+        }
+
+        onPointerUp(id) {
+          const ribbon = this.ribbons.get(id);
+          if (ribbon) {
+            ribbon.active = false;
+            this.completedRibbons.push(ribbon);
+            this.ribbons.delete(id);
+          }
+        }
+
+        update(dt) {
+          this.ribbons.forEach((ribbon) => {
+            ribbon.strands.forEach((strand) => {
+              for (let i = 0; i < strand.points.length; i++) {
+                const p = strand.points[i];
+                p.x += p.vx + Math.sin(STATE.time * 0.03 + p.y * 0.01) * 0.35;
+                p.y += p.vy + Math.cos(STATE.time * 0.03 + p.x * 0.01) * 0.35;
+                p.vx *= 0.94;
+                p.vy *= 0.94;
+              }
+            });
+          });
+
+          for (let i = this.completedRibbons.length - 1; i >= 0; i--) {
+            const ribbon = this.completedRibbons[i];
+            ribbon.life -= 0.016;
+            ribbon.strands.forEach((strand) => {
+              for (let j = 0; j < strand.points.length; j++) {
+                const p = strand.points[j];
+                p.x += p.vx;
+                p.y += p.vy - 0.25;
+              }
+            });
+            if (ribbon.life <= 0) {
+              this.completedRibbons.splice(i, 1);
+            }
+          }
+        }
+
+        drawRibbon(ctx, ribbon) {
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+
+          ribbon.strands.forEach((strand, sIdx) => {
+            const pts = strand.points;
+            if (pts.length < 3) return;
+
+            const hue = ribbon.baseHue + strand.hueShift;
+            const sat = sIdx === 2 ? 95 : 82;
+            const light = strand.lightness;
+            const baseAlpha = (0.32 - sIdx * 0.03) * ribbon.life;
+
+            for (let i = 1; i < pts.length - 1; i++) {
+              const p0 = pts[i - 1];
+              const p1 = pts[i];
+              const p2 = pts[i + 1];
+
+              const mid1X = (p0.x + p1.x) * 0.5;
+              const mid1Y = (p0.y + p1.y) * 0.5;
+              const mid2X = (p1.x + p2.x) * 0.5;
+              const mid2Y = (p1.y + p2.y) * 0.5;
+
+              const taper = Math.sin((i / pts.length) * Math.PI);
+
+              ctx.beginPath();
+              ctx.moveTo(mid1X, mid1Y);
+              ctx.quadraticCurveTo(p1.x, p1.y, mid2X, mid2Y);
+              ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${light}%, ${Math.max(0.02, baseAlpha * taper)})`;
+              ctx.lineWidth = Math.max(0.9, p1.width * taper);
+              ctx.stroke();
+            }
+          });
+
+          ctx.restore();
+        }
+
+        render(ctx) {
+          if (this.needsClear) {
+            ctx.clearRect(0, 0, STATE.width, STATE.height);
+            this.needsClear = false;
+          } else {
+            ctx.save();
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.085)';
+            ctx.fillRect(0, 0, STATE.width, STATE.height);
+            ctx.restore();
+          }
+
+          this.completedRibbons.forEach((r) => this.drawRibbon(ctx, r));
+          this.ribbons.forEach((r) => this.drawRibbon(ctx, r));
+        }
+      }
+
+      // =========================================================================
+      // 5. WORLD 3: FIREFLY SIMULATION (Warm Gold, Amber & Burnt-Orange Bokeh Swarm)
+      // =========================================================================
+      class FireflyWorld {
+        constructor() {
+          this.fireflies = [];
+          this.sparks = [];
+          this.count = Math.min(240, Math.max(110, Math.floor((window.innerWidth * window.innerHeight) / 6500)));
+        }
+
+        reset() {
+          this.fireflies = [];
+          this.sparks = [];
+          this.count = Math.min(240, Math.max(110, Math.floor((STATE.width * STATE.height) / 6500)));
+
+          for (let i = 0; i < this.count; i++) {
+            const paletteRoll = Math.random();
+            const hue = paletteRoll < 0.55
+              ? 40 + Math.random() * 12
+              : paletteRoll < 0.85
+                ? 28 + Math.random() * 12
+                : 16 + Math.random() * 12;
+
+            this.fireflies.push({
+              x: Math.random() * STATE.width,
+              y: Math.random() * STATE.height,
+              vx: (Math.random() - 0.5) * 1.4,
+              vy: (Math.random() - 0.5) * 1.4,
+              size: 1.7 + Math.random() * 2.7,
+              hue,
+              pulsePhase: Math.random() * Math.PI * 2,
+              pulseSpeed: 0.03 + Math.random() * 0.05,
+              orbitDir: Math.random() < 0.5 ? 1 : -1,
+              trail: []
+            });
+          }
+        }
+
+        onPointerDown(x, y) {
+          this.spawnBurst(x, y, 16);
+          audioEngine.playTouchNote('firefly', x / STATE.width, y / STATE.height, 0.8);
+        }
+
+        onPointerMove(x, y, vx, vy, speed) {
+          if (speed > 14) {
+            this.spawnBurst(x, y, Math.min(12, Math.floor(speed / 3)));
+            for (let i = 0; i < this.fireflies.length; i++) {
+              const f = this.fireflies[i];
+              const dx = f.x - x;
+              const dy = f.y - y;
+              const distSq = dx * dx + dy * dy;
+              if (distSq < 18000) {
+                const dist = Math.sqrt(distSq) || 1;
+                const force = (1 - dist / 135) * 6.5;
+                f.vx += (dx / dist) * force + vx * 0.15;
+                f.vy += (dy / dist) * force + vy * 0.15;
+              }
+            }
+          }
+          audioEngine.playTouchNote('firefly', x / STATE.width, y / STATE.height, Math.min(1, speed / 20));
+        }
+
+        spawnBurst(x, y, count) {
+          for (let i = 0; i < count; i++) {
+            if (this.sparks.length > 220) this.sparks.shift();
+            const angle = Math.random() * Math.PI * 2;
+            const spd = 1.5 + Math.random() * 5.5;
+            this.sparks.push({
+              x,
+              y,
+              vx: Math.cos(angle) * spd,
+              vy: Math.sin(angle) * spd,
+              size: 1.3 + Math.random() * 2.3,
+              alpha: 1.0,
+              decay: 0.02 + Math.random() * 0.025,
+              hue: 22 + Math.random() * 28
+            });
+          }
+        }
+
+        update(dt, activeAttractors) {
+          for (let i = 0; i < this.fireflies.length; i++) {
+            const f = this.fireflies[i];
+            f.pulsePhase += f.pulseSpeed;
+
+            f.vx += Math.sin(STATE.time * 0.015 + f.pulsePhase) * 0.04;
+            f.vy += Math.cos(STATE.time * 0.013 + f.pulsePhase * 1.3) * 0.04;
+
+            for (let a = 0; a < activeAttractors.length; a++) {
+              const att = activeAttractors[a];
+              const dx = att.x - f.x;
+              const dy = att.y - f.y;
+              const distSq = dx * dx + dy * dy;
+              const maxRange = 340;
+
+              if (distSq < maxRange * maxRange && distSq > 4) {
+                const dist = Math.sqrt(distSq);
+                const pull = (1 - dist / maxRange) * 0.42;
+                const nx = dx / dist;
+                const ny = dy / dist;
+                const tx = -ny * f.orbitDir;
+                const ty = nx * f.orbitDir;
+
+                f.vx += nx * pull + tx * pull * 0.85;
+                f.vy += ny * pull + ty * pull * 0.85;
+              }
+            }
+
+            f.vx *= 0.955;
+            f.vy *= 0.955;
+            const speed = Math.hypot(f.vx, f.vy);
+            if (speed > 7.5) {
+              f.vx = (f.vx / speed) * 7.5;
+              f.vy = (f.vy / speed) * 7.5;
+            }
+
+            f.x += f.vx;
+            f.y += f.vy;
+
+            if (f.x < -20) f.x = STATE.width + 20;
+            if (f.x > STATE.width + 20) f.x = -20;
+            if (f.y < -20) f.y = STATE.height + 20;
+            if (f.y > STATE.height + 20) f.y = -20;
+
+            f.trail.push({ x: f.x, y: f.y });
+            if (f.trail.length > 8) f.trail.shift();
+          }
+
+          for (let i = this.sparks.length - 1; i >= 0; i--) {
+            const s = this.sparks[i];
+            s.x += s.vx;
+            s.y += s.vy;
+            s.vx *= 0.94;
+            s.vy *= 0.94;
+            s.alpha -= s.decay;
+            if (s.alpha <= 0.01) this.sparks.splice(i, 1);
+          }
+        }
+
+        render(ctx, activeAttractors) {
+          ctx.clearRect(0, 0, STATE.width, STATE.height);
+
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+
+          if (activeAttractors.length > 0) {
+            ctx.lineWidth = 0.8;
+            for (let i = 0; i < this.fireflies.length; i += 2) {
+              const f1 = this.fireflies[i];
+              for (let j = i + 1; j < Math.min(this.fireflies.length, i + 18); j++) {
+                const f2 = this.fireflies[j];
+                const dx = f1.x - f2.x;
+                const dy = f1.y - f2.y;
+                const d2 = dx * dx + dy * dy;
+                if (d2 < 5200) {
+                  const alpha = (1 - d2 / 5200) * 0.2;
+                  ctx.beginPath();
+                  ctx.moveTo(f1.x, f1.y);
+                  ctx.lineTo(f2.x, f2.y);
+                  ctx.strokeStyle = `rgba(251, 191, 36, ${alpha})`;
+                  ctx.stroke();
+                }
+              }
+            }
+          }
+
+          for (let i = 0; i < this.fireflies.length; i++) {
+            const f = this.fireflies[i];
+            const glow = 0.48 + 0.52 * (0.5 + 0.5 * Math.sin(f.pulsePhase));
+
+            if (f.trail.length > 1) {
+              ctx.beginPath();
+              ctx.moveTo(f.trail[0].x, f.trail[0].y);
+              for (let t = 1; t < f.trail.length; t++) {
+                ctx.lineTo(f.trail[t].x, f.trail[t].y);
+              }
+              ctx.strokeStyle = `hsla(${f.hue}, 100%, 64%, ${glow * 0.3})`;
+              ctx.lineWidth = f.size * 0.9;
+              ctx.stroke();
+            }
+
+            const auraRadius = f.size * (4.5 + glow * 2.8);
+            const aura = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, auraRadius);
+            aura.addColorStop(0, `hsla(${f.hue + 6}, 100%, 76%, ${glow * 0.65})`);
+            aura.addColorStop(0.45, `hsla(${f.hue - 4}, 96%, 54%, ${glow * 0.24})`);
+            aura.addColorStop(1, `hsla(${f.hue - 10}, 90%, 40%, 0)`);
+            ctx.fillStyle = aura;
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, auraRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, f.size * 0.8, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${f.hue + 12}, 100%, 92%, ${glow})`;
+            ctx.fill();
+          }
+
+          for (let i = 0; i < this.sparks.length; i++) {
+            const s = this.sparks[i];
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${s.hue}, 100%, 76%, ${s.alpha})`;
+            ctx.fill();
+          }
+
+          ctx.restore();
+        }
+      }
+
+      const worlds = {
+        water: new WaterWorld(),
+        silk: new SilkWorld(),
+        firefly: new FireflyWorld()
+      };
+
+      // =========================================================================
+      // 6. CANVAS RESIZE & HIGH-DPI SCALING
+      // =========================================================================
+      function handleResize() {
+        STATE.width = window.innerWidth;
+        STATE.height = window.innerHeight;
+        STATE.dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        canvas.width = Math.floor(STATE.width * STATE.dpr);
+        canvas.height = Math.floor(STATE.height * STATE.dpr);
+        canvas.style.width = `${STATE.width}px`;
+        canvas.style.height = `${STATE.height}px`;
+
+        ctx.setTransform(STATE.dpr, 0, 0, STATE.dpr, 0, 0);
+
+        if (STATE.world === 'silk') {
+          worlds.silk.needsClear = true;
+        }
+      }
+
+      window.addEventListener('resize', handleResize);
+
+      // =========================================================================
+      // 7. MULTI-TOUCH & POINTER INPUT HANDLERS
+      // =========================================================================
+      function unlockAudioOnFirstGesture() {
+        if (!STATE.audioInitialized && !STATE.soundEnabled) {
+          setSoundState(true);
+        }
+      }
+
+      function onPointerDown(e) {
+        if (e.target !== canvas) return;
+        e.preventDefault();
+        unlockAudioOnFirstGesture();
+
+        STATE.lastInteractionTime = performance.now();
+        const x = e.clientX;
+        const y = e.clientY;
+
+        STATE.pointers.set(e.pointerId, {
+          id: e.pointerId,
+          x,
+          y,
+          prevX: x,
+          prevY: y,
+          vx: 0,
+          vy: 0
+        });
+
+        if (STATE.world === 'silk') {
+          worlds.silk.onPointerUp('idle');
+          worlds.silk.onPointerDown(e.pointerId, x, y);
+        } else if (STATE.world === 'water') {
+          worlds.water.onPointerDown(x, y);
+        } else if (STATE.world === 'firefly') {
+          worlds.firefly.onPointerDown(x, y);
+        }
+      }
+
+      function onPointerMove(e) {
+        if (!STATE.pointers.has(e.pointerId)) {
+          if (e.pointerType === 'mouse' && e.target === canvas) {
+            STATE.lastInteractionTime = performance.now();
+            const x = e.clientX;
+            const y = e.clientY;
+            const hoverPtr = STATE.pointers.get('mouse-hover') || { id: 'mouse-hover', x, y, prevX: x, prevY: y, vx: 0, vy: 0 };
+            const vx = x - hoverPtr.x;
+            const vy = y - hoverPtr.y;
+            const speed = Math.hypot(vx, vy);
+            hoverPtr.prevX = hoverPtr.x;
+            hoverPtr.prevY = hoverPtr.y;
+            hoverPtr.x = x;
+            hoverPtr.y = y;
+            hoverPtr.vx = vx;
+            hoverPtr.vy = vy;
+            STATE.pointers.set('mouse-hover', hoverPtr);
+
+            if (speed > 0.5) {
+              dispatchMove('mouse-hover', x, y, vx, vy, speed);
+            }
+          }
+          return;
+        }
+
+        e.preventDefault();
+        STATE.lastInteractionTime = performance.now();
+        const ptr = STATE.pointers.get(e.pointerId);
+        const x = e.clientX;
+        const y = e.clientY;
+        const vx = x - ptr.x;
+        const vy = y - ptr.y;
+        const speed = Math.hypot(vx, vy);
+
+        ptr.prevX = ptr.x;
+        ptr.prevY = ptr.y;
+        ptr.x = x;
+        ptr.y = y;
+        ptr.vx = vx;
+        ptr.vy = vy;
+
+        dispatchMove(e.pointerId, x, y, vx, vy, speed);
+      }
+
+      function dispatchMove(id, x, y, vx, vy, speed) {
+        if (STATE.world === 'water') {
+          worlds.water.onPointerMove(x, y, vx, vy, speed);
+        } else if (STATE.world === 'silk') {
+          worlds.silk.onPointerMove(id, x, y, vx, vy, speed);
+        } else if (STATE.world === 'firefly') {
+          worlds.firefly.onPointerMove(x, y, vx, vy, speed);
+        }
+      }
+
+      function onPointerUpOrCancel(e) {
+        if (STATE.pointers.has(e.pointerId)) {
+          STATE.pointers.delete(e.pointerId);
+          if (STATE.world === 'silk') {
+            worlds.silk.onPointerUp(e.pointerId);
+          }
+        }
+      }
+
+      canvas.addEventListener('pointerdown', onPointerDown, { passive: false });
+      window.addEventListener('pointermove', onPointerMove, { passive: false });
+      window.addEventListener('pointerup', onPointerUpOrCancel);
+      window.addEventListener('pointercancel', onPointerUpOrCancel);
+
+      document.addEventListener('mouseleave', () => {
+        if (STATE.pointers.has('mouse-hover')) {
+          STATE.pointers.delete('mouse-hover');
+          if (STATE.world === 'silk') {
+            worlds.silk.onPointerUp('mouse-hover');
+          }
+        }
+      });
+
+      // =========================================================================
+      // 8. AMBIENT IDLE SHOWCASE AI (Keeps Booth Display Alive When Untouched)
+      // =========================================================================
+      function updateIdleShowcase() {
+        const now = performance.now();
+        const isIdle = STATE.pointers.size === 0 && (now - STATE.lastInteractionTime > 2600);
+
+        if (!isIdle) {
+          if (STATE.world === 'silk' && worlds.silk.ribbons.has('idle')) {
+            worlds.silk.onPointerUp('idle');
+          }
+          return;
+        }
+
+        const agent = STATE.idleAgent;
+        agent.angle += 0.022;
+        const cx = STATE.width * 0.5;
+        const cy = STATE.height * 0.5;
+        const rx = Math.min(STATE.width * 0.3, 280);
+        const ry = Math.min(STATE.height * 0.24, 190);
+
+        const targetX = cx + Math.sin(agent.angle) * rx;
+        const targetY = cy + Math.sin(agent.angle * 2) * ry;
+        const vx = targetX - agent.x;
+        const vy = targetY - agent.y;
+        const speed = Math.hypot(vx, vy);
+
+        agent.x = targetX;
+        agent.y = targetY;
+        agent.pulseTimer++;
+
+        if (STATE.world === 'water') {
+          if (agent.pulseTimer % 36 === 0) {
+            worlds.water.spawnRipple(agent.x, agent.y, 0.85, 190);
+          }
+        } else if (STATE.world === 'silk') {
+          worlds.silk.onPointerMove('idle', agent.x, agent.y, vx, vy, speed * 1.4);
+        }
+      }
+
+      // =========================================================================
+      // 9. UI CONTROLS: WORLD SWITCHER, SOUND, PAUSE, RESET, GUIDE MODAL
+      // =========================================================================
+      function switchWorld(newWorld) {
+        if (!worlds[newWorld]) return;
+        STATE.world = newWorld;
+        STATE.worldTransitionAlpha = 0.75;
+        STATE.lastInteractionTime = performance.now();
+
+        Object.keys(bgLayers).forEach((key) => {
+          if (bgLayers[key]) {
+            bgLayers[key].classList.toggle('active', key === newWorld);
+          }
+        });
+
+        worldButtons.forEach((btn) => {
+          const w = btn.dataset.world;
+          btn.classList.remove('active-water', 'active-silk', 'active-firefly', 'text-slate-300');
+          if (w === newWorld) {
+            btn.classList.add(WORLD_META[w].activeClass);
+          } else {
+            btn.classList.add('text-slate-300');
+          }
+        });
+
+        worldStatusDot.className = `w-2.5 h-2.5 rounded-full transition-colors duration-500 ${WORLD_META[newWorld].dotClass}`;
+        navGuideText.textContent = WORLD_META[newWorld].guide;
+
+        ctx.clearRect(0, 0, STATE.width, STATE.height);
+
+        if (newWorld === 'silk') {
+          worlds.silk.needsClear = true;
+        } else if (newWorld === 'water' && worlds.water.waves.length === 0) {
+          worlds.water.reset();
+        } else if (newWorld === 'firefly' && worlds.firefly.fireflies.length === 0) {
+          worlds.firefly.reset();
+        }
+
+        if (STATE.paused) {
+          renderFrame();
+        }
+      }
+
+      worldButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          unlockAudioOnFirstGesture();
+          switchWorld(btn.dataset.world);
+        });
+      });
+
+      function setSoundState(enabled) {
+        STATE.soundEnabled = enabled;
+        audioEngine.setEnabled(enabled);
+
+        if (enabled) {
+          iconSoundOff.classList.add('hidden');
+          iconSoundOn.classList.remove('hidden');
+          soundLabel.textContent = 'Sound On';
+          soundLabel.classList.replace('text-slate-300', 'text-cyan-300');
+        } else {
+          iconSoundOn.classList.add('hidden');
+          iconSoundOff.classList.remove('hidden');
+          soundLabel.textContent = 'Sound Off';
+          soundLabel.classList.replace('text-cyan-300', 'text-slate-300');
+        }
+      }
+
+      btnSound.addEventListener('click', () => {
+        setSoundState(!STATE.soundEnabled);
+      });
+
+      function setPausedState(paused) {
+        STATE.paused = paused;
+        if (paused) {
+          iconPause.classList.add('hidden');
+          iconPlay.classList.remove('hidden');
+          pauseLabel.textContent = 'Resume';
+          pausedBanner.classList.remove('opacity-0');
+        } else {
+          iconPlay.classList.add('hidden');
+          iconPause.classList.remove('hidden');
+          pauseLabel.textContent = 'Pause';
+          pausedBanner.classList.add('opacity-0');
+        }
+      }
+
+      btnPause.addEventListener('click', () => {
+        setPausedState(!STATE.paused);
+      });
+
+      btnRestart.addEventListener('click', () => {
+        worlds[STATE.world].reset();
+        STATE.worldTransitionAlpha = 0.85;
+        if (STATE.paused) {
+          renderFrame();
+        }
+      });
+
+      function openHelpModal() {
+        helpModal.classList.remove('opacity-0', 'pointer-events-none');
+        helpModalCard.classList.remove('scale-95');
+        helpModalCard.classList.add('scale-100');
+      }
+
+      function closeHelpModal() {
+        helpModal.classList.add('opacity-0', 'pointer-events-none');
+        helpModalCard.classList.remove('scale-100');
+        helpModalCard.classList.add('scale-95');
+        unlockAudioOnFirstGesture();
+      }
+
+      btnHelp.addEventListener('click', openHelpModal);
+      btnCloseHelpX.addEventListener('click', closeHelpModal);
+      btnStartExperience.addEventListener('click', closeHelpModal);
+      helpModal.addEventListener('click', (e) => {
+        if (e.target === helpModal) closeHelpModal();
+      });
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key === '1') switchWorld('water');
+        if (e.key === '2') switchWorld('silk');
+        if (e.key === '3') switchWorld('firefly');
+        if (e.key === ' ') {
+          e.preventDefault();
+          setPausedState(!STATE.paused);
+        }
+        if (e.key.toLowerCase() === 'r') {
+          worlds[STATE.world].reset();
+        }
+        if (e.key.toLowerCase() === 'm') {
+          setSoundState(!STATE.soundEnabled);
+        }
+        if (e.key === 'Escape') {
+          closeHelpModal();
+        }
+      });
+
+      // =========================================================================
+      // 10. MAIN 60FPS ANIMATION LOOP
+      // =========================================================================
+      function getActiveAttractors() {
+        const list = [];
+        STATE.pointers.forEach((ptr) => {
+          list.push({ x: ptr.x, y: ptr.y });
+        });
+        if (list.length === 0) {
+          list.push({ x: STATE.idleAgent.x, y: STATE.idleAgent.y });
+        }
+        return list;
+      }
+
+      function renderFrame() {
+        const currentWorld = worlds[STATE.world];
+        const attractors = getActiveAttractors();
+
+        currentWorld.render(ctx, attractors);
+
+        if (STATE.worldTransitionAlpha > 0.01) {
+          ctx.save();
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillStyle = `rgba(4, 5, 10, ${STATE.worldTransitionAlpha * 0.55})`;
+          ctx.fillRect(0, 0, STATE.width, STATE.height);
+          ctx.restore();
+          STATE.worldTransitionAlpha *= 0.84;
+        }
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        if (STATE.paused) return;
+
+        STATE.time += 1;
+        updateIdleShowcase();
+
+        const currentWorld = worlds[STATE.world];
+        const attractors = getActiveAttractors();
+
+        currentWorld.update(1, attractors);
+        renderFrame();
+      }
+
+      // =========================================================================
+      // 11. BOOTSTRAP APPLICATION ON WINDOW LOAD
+      // =========================================================================
+      window.addEventListener('load', () => {
+        generateEmbeddedPhotoBackdrops();
+        handleResize();
+        worlds.water.reset();
+        worlds.silk.reset();
+        worlds.firefly.reset();
+        switchWorld('water');
+        animate();
+      });
+    })();
+  </script>
+</body>
+</html>
